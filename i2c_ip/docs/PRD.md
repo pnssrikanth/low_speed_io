@@ -2,20 +2,21 @@
 
 ## 1. Introduction
 
-This document outlines the requirements for an open-source, production-ready I2C (Inter-Integrated Circuit) IP core designed for use in micro-controllers, application processors, FPGAs, and ASICs. The IP provides a flexible, standards-compliant implementation of the I2C protocol.
+This document outlines the requirements for an open-source, production-ready I2C (Inter-Integrated Circuit) IP core designed for use in micro-controllers, application processors, automotive devices, FPGAs, and ASICs. The IP provides a flexible, standards-compliant implementation of the I2C protocol, with additional features for automotive-grade reliability and safety.
 
 ## 2. Purpose
 
-The I2C IP core enables seamless integration of I2C communication in digital designs, supporting both master and slave operations. It is intended for off-the-shelf use in embedded systems, IoT devices, and SoC designs requiring reliable serial communication.
+The I2C IP core enables seamless integration of I2C communication in digital designs, supporting both master and slave operations. It is intended for off-the-shelf use in embedded systems, IoT devices, automotive ECUs, and SoC designs requiring reliable serial communication with automotive-grade safety and reliability.
 
 ## 3. Scope
 
 ### In Scope
 - Verilog implementation of I2C master and slave functionality
 - Configuration options for mode selection
-- Compliance with I2C standards
+- Compliance with I2C standards and automotive safety standards (ISO 26262)
 - SoC fabric integration using ARM protocols
 - FPGA and ASIC compatibility
+- Automotive-grade reliability and fault tolerance
 - Open-source licensing and development environment
 
 ### Out of Scope
@@ -33,8 +34,10 @@ The I2C IP core enables seamless integration of I2C communication in digital des
   - Slave-only mode
   - Dual mode (both master and slave)
 - **Data Transfer**: Support for 7-bit and 10-bit addressing, standard mode (100 kbps), fast mode (400 kbps), fast mode plus (1 Mbps), and high-speed mode (3.4 Mbps)
-- **Error Handling**: Detection and reporting of bus errors, arbitration loss, and acknowledge failures
+- **Error Handling**: Detection and reporting of bus errors, arbitration loss, acknowledge failures, and automotive-specific faults
+- **Fault Tolerance**: Built-in redundancy and recovery mechanisms for critical automotive applications
 - **Multi-Master Support**: Arbitration and clock synchronization in multi-master environments
+- **Diagnostics**: Self-test and diagnostic modes for automotive compliance
 
 ### 4.2 Configuration and Control
 - **Slave Address Configuration**: Programmable 7-bit or 10-bit slave address
@@ -58,13 +61,35 @@ The I2C IP core enables seamless integration of I2C communication in digital des
 - **Technology Nodes**: Portable across all ASIC technology nodes (e.g., 28nm, 14nm, 7nm)
 - **FPGA Vendors**: Compatible with Xilinx, Intel/Altera, and Lattice FPGAs
 - **EDA Tools**: Fully synthesizable with open-source tools (Yosys, OpenROAD) and commercial tools (Synopsys, Cadence)
-- **Standards Compliance**: Adhere to I2C specifications from NXP/Philips and industry standards
+- **Standards Compliance**: Adhere to I2C specifications from NXP/Philips, ISO 26262 for functional safety, and AEC-Q100 for automotive reliability
+- **Operating Conditions**: Support for automotive temperature ranges (-40°C to 125°C) and voltage variations
 
 ### 5.3 Reliability
-- **Robustness**: Handle bus contention, noise, and electrical disturbances
-- **Testability**: Built-in self-test features and scan chain support
+- **Robustness**: Handle bus contention, noise, electrical disturbances, and automotive EMI/EMC requirements
+- **Testability**: Built-in self-test features, scan chain support, and automotive diagnostic capabilities
+- **Safety Integrity**: ASIL B/C compliance for functional safety in automotive applications
+- **MTBF**: Target Mean Time Between Failures suitable for automotive lifecycles (10+ years)
 
-## 6. Interfaces
+## 6. Automotive-Specific Requirements
+
+### 6.1 Safety and Reliability
+- **ISO 26262 Compliance**: Design to meet ASIL B requirements for functional safety
+- **Fault Detection and Mitigation**: Hardware and software mechanisms for detecting and recovering from faults
+- **Redundancy**: Optional redundant I2C channels for critical applications
+- **Watchdog and Monitoring**: Built-in monitoring for bus health and transaction integrity
+
+### 6.2 Environmental Requirements
+- **Temperature Range**: Operation from -40°C to 125°C (automotive grade 1)
+- **EMI/EMC**: Compliance with automotive electromagnetic compatibility standards
+- **ESD Protection**: Design considerations for electrostatic discharge up to 8kV
+- **Vibration and Shock**: Robustness against automotive vibration profiles
+
+### 6.3 Automotive Protocols Integration
+- **CAN Integration**: Optional bridging to CAN bus for automotive networks
+- **LIN Compatibility**: Support for LIN (Local Interconnect Network) protocol integration
+- **Diagnostic Interfaces**: OBD-II compliant diagnostic capabilities
+
+## 7. Interfaces
 
 ### 6.1 External Interfaces
 - **I2C Bus**: SDA (bidirectional data) and SCL (clock) lines
@@ -75,7 +100,7 @@ The I2C IP core enables seamless integration of I2C communication in digital des
 - **Interrupt Lines**: For event signaling
 - **Clock and Reset**: System clock and reset inputs
 
-## 7. Development Environment
+## 8. Development Environment
 
 ### 7.1 Open-Source Tools
 - **Synthesis**: Yosys for FPGA and ASIC synthesis
@@ -93,7 +118,7 @@ The I2C IP core enables seamless integration of I2C communication in digital des
 - Automated scripts for simulation, synthesis, and testing
 - Continuous Integration (CI) setup with GitHub Actions
 
-## 8. Testing and Verification
+## 9. Testing and Verification
 
 ### 8.1 Test Coverage
 - Unit tests for individual modules
@@ -106,7 +131,7 @@ The I2C IP core enables seamless integration of I2C communication in digital des
 - Formal verification for critical paths
 - FPGA prototyping for real-world validation
 
-## 9. Licensing and Distribution
+## 10. Licensing and Distribution
 
 ### 9.1 Licensing
 - Open-source license (e.g., Apache 2.0 or MIT) allowing free use, modification, and distribution
@@ -117,7 +142,7 @@ The I2C IP core enables seamless integration of I2C communication in digital des
 - Documentation and examples provided
 - Community support through issues and discussions
 
-## 10. Timeline and Milestones
+## 11. Timeline and Milestones
 
 ### Phase 1: Design and Implementation
 - Complete RTL design
@@ -131,12 +156,12 @@ The I2C IP core enables seamless integration of I2C communication in digital des
 - Final documentation
 - Open-source release
 
-## 11. Risks and Mitigations
+## 12. Risks and Mitigations
 
 - **Standards Compliance**: Regular review against I2C specifications
 - **Tool Compatibility**: Testing across multiple EDA tools
 - **Performance**: Iterative optimization and profiling
 
-## 12. Conclusion
+## 13. Conclusion
 
-This PRD defines a comprehensive, open-source I2C IP core suitable for modern embedded systems. The design emphasizes flexibility, compatibility, and ease of integration while maintaining high performance and reliability.
+This PRD defines a comprehensive, open-source I2C IP core suitable for modern embedded systems, including automotive applications. The design emphasizes flexibility, compatibility, safety, and ease of integration while maintaining high performance, reliability, and compliance with automotive standards.
