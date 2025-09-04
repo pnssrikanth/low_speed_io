@@ -42,6 +42,7 @@ This IP core includes:
 ### I2C Standards
 - I2C-bus specification (UM10204) by NXP Semiconductors
 - Support for all timing specifications and electrical characteristics
+- Compatibility with emerging I3C (Improved Inter-Integrated Circuit) protocol for higher speeds and enhanced features
 
 ### Automotive Standards
 - ISO 26262: Road vehicles - Functional safety
@@ -50,6 +51,10 @@ This IP core includes:
 ### Interface Standards
 - ARM AMBA 3 APB Protocol Specification
 - ARM AMBA 3 AHB-Lite Protocol Specification
+
+### Security Standards
+- Basic security features for data protection and secure boot
+- Optional encryption support for sensitive I2C transactions
 
 ## 1.5 Target Applications
 

@@ -225,6 +225,24 @@ property p_eventual_response;
     @(posedge clk) disable iff (!rst_n)
     start_transaction |-> ##[1:1000] transaction_complete;
 endproperty
+
+// Multi-master properties
+property p_arbitration_fairness;
+    @(posedge scl) disable iff (!rst_n)
+    arbitration_start |-> ##[1:100] arbitration_complete or arbitration_lost;
+endproperty
+
+// Clock stretching properties
+property p_clock_stretching;
+    @(posedge scl) disable iff (!rst_n)
+    sda_low_during_clock |-> ##1 scl_stretch;
+endproperty
+
+// Security properties
+property p_secure_access;
+    @(posedge clk) disable iff (!rst_n)
+    secure_mode && unauthorized_access |-> ##1 access_denied;
+endproperty
 ```
 
 ### 9.4.2 Assertions
@@ -323,6 +341,8 @@ echo "Regression complete. Results in $RESULTS_DIR"
 - **Branch Coverage**: > 90%
 - **Condition Coverage**: > 85%
 - **Toggle Coverage**: > 90%
+- **FSM State Coverage**: > 98%
+- **Path Coverage**: > 80%
 
 ### 9.7.2 Functional Coverage
 

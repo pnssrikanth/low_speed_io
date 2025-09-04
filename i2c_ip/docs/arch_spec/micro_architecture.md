@@ -2,6 +2,28 @@
 
 ## 5.1 State Machines
 
+### 5.1.0 Multi-Master Arbitration
+
+The IP core supports multi-master operation with sophisticated arbitration mechanisms:
+
+- **Bus Arbitration**: Monitors SDA during transmission; releases bus if another master takes control
+- **Arbitration Lost Detection**: Immediate detection and clean bus release
+- **Clock Synchronization**: Synchronizes SCL with other masters using wired-AND logic
+- **Clock Stretching**: Handles slave-initiated clock stretching for slow operations
+- **Arbitration Recovery**: Automatic retry mechanism after arbitration loss
+
+```verilog
+// Arbitration detection logic
+always @(posedge scl) begin
+    if (sda_out != sda_in) begin
+        arbitration_lost <= 1;
+        // Release bus control
+        sda_dir <= 0;
+        state <= ARB_LOST;
+    end
+end
+```
+
 ### 5.1.1 Master Controller State Machine
 
 The master controller implements the I2C master protocol using a finite state machine (FSM).
