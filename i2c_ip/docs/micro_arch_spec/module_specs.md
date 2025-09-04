@@ -141,6 +141,113 @@ This document details the internal modules of the I2C IP core, their interconnec
 - `FILTER_LEN`: Filter length in clock cycles (default: 3)
 - `PULLUP_EN`: Internal pull-up enable (default: 1)
 
+### 6. SMBus PEC (Packet Error Checking) Module
+**Purpose**: Implements SMBus Packet Error Checking for data integrity in SMBus transactions.
+
+**Key Features**:
+- CRC-8 calculation using polynomial x^8 + x^2 + x + 1
+- Automatic PEC byte insertion/removal
+- PEC validation on received data
+- Error reporting for PEC mismatches
+
+**Parameters**:
+- `PEC_EN`: Enable PEC functionality (default: 0 for I2C, 1 for SMBus)
+- `PEC_POLY`: CRC polynomial (default: 8'h07)
+
+**Interface**:
+- Input: `pec_data_in`, `pec_valid`, `pec_start`
+- Output: `pec_byte`, `pec_error`, `pec_done`
+
+**Operation**:
+1. PEC calculation starts with slave address
+2. All transmitted/received data bytes included in CRC
+3. PEC byte automatically appended to transmit data
+4. Received PEC byte validated against calculated CRC
+5. Error flag set on PEC mismatch
+
+**Integration**:
+- PEC module interfaces with Shift Register for data streaming
+- Control FSM manages PEC enable/disable per transaction
+- Status register includes PEC error bit
+
+### 7. Power Management Module
+**Purpose**: Manages low-power states and clock gating to reduce power consumption.
+
+**Power States**:
+- **ACTIVE**: Full operation, all clocks running
+- **IDLE**: Core idle, clocks gated, registers retain state
+- **SLEEP**: Deep sleep, minimal power, state preserved
+- **OFF**: Power off, state lost (requires re-initialization)
+
+**State Transitions**:
+```
+ACTIVE → IDLE: Auto-transition after inactivity timeout
+IDLE → ACTIVE: On bus activity or register access
+ACTIVE/IDLE → SLEEP: Software command or external signal
+SLEEP → ACTIVE: Wake-up interrupt or bus activity
+SLEEP/OFF → OFF: Power control signal
+OFF → ACTIVE: Power-on reset sequence
+```
+
+**Clock Gating**:
+- Individual module clock gating based on activity
+- Clock Manager gates SCL generation when idle
+- Register Bank clocks gated during sleep
+- Control FSM clock gated when not processing
+
+**Wake-up Sources**:
+- Bus activity detection (START condition)
+- External wake-up interrupt
+- Software register access
+- Timer-based wake-up
+
+**Power Control Interface**:
+- Input: `power_state_req`, `wake_up_en`
+- Output: `power_state_ack`, `wake_up_event`
+
+**Parameters**:
+- `IDLE_TIMEOUT`: Inactivity timeout for auto-idle (default: 1000 cycles)
+- `SLEEP_EN`: Enable sleep mode (default: 1)
+- `WAKE_ON_BUS`: Wake on bus activity (default: 1)
+
+### 8. Debug and Test Interface Module
+**Purpose**: Provides debug access and test capabilities for development and production testing.
+
+**JTAG Interface**:
+- IEEE 1149.1 compliant TAP controller
+- Boundary scan chain for IO pins
+- Internal scan chains for registers and FSM
+- Debug register access through JTAG
+
+**JTAG Signals**:
+- `TCK`: Test clock
+- `TMS`: Test mode select
+- `TDI`: Test data in
+- `TDO`: Test data out
+- `TRST`: Test reset (optional)
+
+**Debug Features**:
+- **Register Override**: Force register values for testing
+- **Signal Probing**: Access internal signals through debug registers
+- **Breakpoint on Events**: Halt on specific bus conditions
+- **Transaction Logging**: Capture bus transactions to debug memory
+- **Error Injection**: Force errors for fault testing
+
+**Debug Registers** (Address range 0x100-0x1FF):
+| Address | Name | Access | Description |
+|---------|------|--------|-------------|
+| 0x100 | DBG_CTRL | RW | Debug control register |
+| 0x104 | DBG_STATUS | RO | Debug status |
+| 0x108 | DBG_DATA | RW | Debug data access |
+| 0x10C | DBG_BREAK | RW | Breakpoint configuration |
+| 0x110 | DBG_LOG | RO | Transaction log |
+
+**Test Modes**:
+- **Scan Test**: Full scan chain testing
+- **BIST**: Built-in self-test for memories and logic
+- **Loopback Test**: Internal loopback for IO testing
+- **Speed Test**: Automated speed verification
+
 ## Configurability Options
 
 ### Speed Mode Configuration

@@ -115,6 +115,30 @@ The `irq` signal is asserted for the following events:
 - Bus error detection
 - Slave address match (in slave mode)
 
+### Interrupt Prioritization
+The IP core supports multiple interrupt sources with configurable priority levels. Interrupt prioritization ensures critical events are handled first.
+
+**Interrupt Sources and Priorities:**
+| Interrupt Source | Priority Level | Description |
+|------------------|----------------|-------------|
+| Bus Error | Highest (0) | Critical bus faults requiring immediate attention |
+| Arbitration Loss | High (1) | Multi-master arbitration failure |
+| Slave Address Match | Medium (2) | Slave mode address recognition |
+| Transmission Complete | Medium (3) | TX operation finished |
+| Reception Complete | Low (4) | RX operation finished |
+
+**Priority Resolution:**
+- Fixed priority scheme: Lower number = higher priority
+- Interrupt masking available per source
+- Priority can be reconfigured via configuration registers
+- Nested interrupt support for complex scenarios
+
+**Interrupt Controller Interface:**
+- `irq_mask[4:0]`: Individual interrupt mask bits
+- `irq_pend[4:0]`: Pending interrupt status
+- `irq_ack`: Interrupt acknowledge signal
+- `irq_vector[2:0]`: Encoded interrupt vector for priority
+
 ## Power Management
 - Low power modes supported through `enable` signal
 - Clock gating for unused modules

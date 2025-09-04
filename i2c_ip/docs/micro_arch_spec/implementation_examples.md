@@ -357,6 +357,134 @@ endmodule
 - Operand isolation for multi-cycle paths
 - Multi-voltage domains where applicable
 
+## Synthesis Constraints Examples
+
+### Timing Constraints (SDC Format)
+```tcl
+# Clock definitions
+create_clock -name sys_clk -period 10.0 [get_ports sys_clk]
+create_clock -name scl -period 10000.0 [get_ports scl_in] ;# 100kHz I2C clock
+
+# Clock groups for asynchronous clocks
+set_clock_groups -asynchronous -group {sys_clk} -group {scl}
+
+# Input delay constraints for I2C inputs
+set_input_delay -clock scl -max 2000.0 [get_ports sda_in]
+set_input_delay -clock scl -min 1000.0 [get_ports sda_in]
+set_input_delay -clock scl -max 2000.0 [get_ports scl_in]
+set_input_delay -clock scl -min 1000.0 [get_ports scl_in]
+
+# Output delay constraints for I2C outputs
+set_output_delay -clock scl -max 3000.0 [get_ports {sda_out sda_oe scl_out scl_oe}]
+set_output_delay -clock scl -min 1000.0 [get_ports {sda_out sda_oe scl_out scl_oe}]
+
+# False path constraints for asynchronous resets
+set_false_path -from [get_ports rst_n] -to [all_registers]
+
+# Multi-cycle path for slow I2C operations
+set_multicycle_path -setup 4 -from [get_cells i2c_master_fsm/*] -to [get_cells shift_register/*]
+set_multicycle_path -hold 3 -from [get_cells i2c_master_fsm/*] -to [get_cells shift_register/*]
+
+# Clock gating checks
+set_clock_gating_check -setup 0.5 -hold 0.1 [get_cells *clock_gate*]
+```
+
+### Area Constraints
+```tcl
+# Maximum area constraint
+set_max_area 50000
+
+# Hierarchical area budgets
+set_attribute [get_cells clock_manager] max_area 10000
+set_attribute [get_cells control_fsm] max_area 15000
+set_attribute [get_cells shift_register] max_area 8000
+set_attribute [get_cells register_bank] max_area 12000
+```
+
+### Power Constraints
+```tcl
+# Power domain definitions
+create_power_domain PD_CORE -include [get_cells *]
+create_power_domain PD_IO -include [get_cells *io_buffer*]
+
+# Power intent
+set_domain_supply_voltage PD_CORE 1.2
+set_domain_supply_voltage PD_IO 3.3
+
+# Leakage power constraints
+set_max_leakage_power 10.0
+
+# Dynamic power constraints
+set_max_dynamic_power 50.0
+```
+
+### Design Rule Constraints
+```tcl
+# Maximum fanout
+set_max_fanout 20 [get_cells *]
+
+# Maximum transition time
+set_max_transition 1.0 [get_cells *]
+
+# Capacitance constraints
+set_max_capacitance 0.5 [get_nets *]
+
+# Don't touch constraints for critical paths
+set_dont_touch [get_nets {sda_in scl_in}]
+set_dont_touch [get_cells clock_manager]
+```
+
+### Synthesis Attributes
+```verilog
+// In RTL code
+module i2c_core (
+    // ...
+);
+
+// Synthesis attributes
+(* dont_touch = "true" *) reg critical_reg;
+(* max_fanout = 10 *) wire high_fanout_net;
+(* keep = "true" *) wire debug_signal;
+
+// Clock gating attribute
+(* clock_gating_enable = "true" *) reg clk_gate_reg;
+
+endmodule
+```
+
+### Tool-Specific Constraints Examples
+
+#### Synopsys Design Compiler
+```tcl
+# Compile directives
+set compile_seqmap_propagate_constants false
+set compile_seqmap_propagate_high_effort true
+set compile_enable_register_merging false
+
+# Ungrouping for better QoR
+set_ungroup [get_cells control_fsm] false
+set_ungroup [get_cells clock_manager] false
+
+# Boundary optimization
+set_boundary_optimization [get_cells *] false
+```
+
+#### Cadence Genus
+```tcl
+# Synthesis flow setup
+set_db / .library {/path/to/std_cells.lib}
+set_db / .lef_files {/path/to/tech.lef}
+
+# Timing derate for safety
+set_timing_derate -early 0.9
+set_timing_derate -late 1.1
+
+# Effort levels
+set_db / .syn_generic_effort high
+set_db / .syn_map_effort high
+set_db / .syn_opt_effort high
+```
+
 ## Common Pitfalls to Avoid
 
 1. **Race Conditions**: Always use non-blocking assignments in sequential blocks

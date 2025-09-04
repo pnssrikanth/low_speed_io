@@ -352,6 +352,99 @@ def run_regression():
     return results
 ```
 
+## Corner Case Testing Scenarios
+
+### 1. Bus Contention and Arbitration
+- **Scenario**: Multiple masters start transmission simultaneously
+- **Test Case**: Two masters attempt to send START condition at the same time
+- **Expected Behavior**: Arbitration winner completes transmission, loser backs off
+- **Verification**: Monitor SDA during arbitration phase, check for proper bus release
+
+### 2. Clock Stretching Limits
+- **Scenario**: Slave stretches clock for maximum allowed time
+- **Test Case**: Slave holds SCL low for 10ms (beyond typical 100μs)
+- **Expected Behavior**: Master times out or handles gracefully
+- **Verification**: Check timeout mechanisms and error reporting
+
+### 3. Invalid Bus States
+- **Scenario**: SDA changes while SCL is high (invalid START/STOP)
+- **Test Case**: Force SDA toggle during SCL high periods
+- **Expected Behavior**: Bus error detection and recovery
+- **Verification**: Error flag assertion, bus reset capability
+
+### 4. Address Boundary Conditions
+- **Scenario**: 7-bit to 10-bit address transitions
+- **Test Case**: Addresses 0x00, 0x7F, 0x80, 0xFF, 0x100, 0x3FF
+- **Expected Behavior**: Proper address recognition and ACK
+- **Verification**: ACK timing, address match detection
+
+### 5. Data Corruption Scenarios
+- **Scenario**: Bit errors during transmission
+- **Test Case**: Inject single-bit errors in data stream
+- **Expected Behavior**: NACK response, retransmission request
+- **Verification**: CRC check failures, error counters
+
+### 6. Timing Violations
+- **Scenario**: Setup/hold time violations on SDA/SCL
+- **Test Case**: Minimum timing margins (10% below spec)
+- **Expected Behavior**: Reliable operation or error detection
+- **Verification**: Data integrity checks, timing margin analysis
+
+### 7. Power State Transitions
+- **Scenario**: Frequent power mode changes during transmission
+- **Test Case**: Switch between ACTIVE/IDLE/SLEEP during data transfer
+- **Expected Behavior**: No data loss, proper state recovery
+- **Verification**: Data continuity, state machine integrity
+
+### 8. Multi-Byte Transfer Interruptions
+- **Scenario**: Interrupts during multi-byte I2C transactions
+- **Test Case**: CPU interrupt service during ongoing I2C transfer
+- **Expected Behavior**: Transfer completion or graceful abort
+- **Verification**: FIFO status, transfer resume capability
+
+### 9. FIFO Overflow/Underflow
+- **Scenario**: Data rate mismatches between CPU and I2C bus
+- **Test Case**: CPU writes faster than I2C transmits (overflow)
+- **Test Case**: I2C receives faster than CPU reads (underflow)
+- **Expected Behavior**: Error indication, flow control
+- **Verification**: FIFO flags, data loss prevention
+
+### 10. Hot Plug Scenarios
+- **Scenario**: Slave devices connected/disconnected during operation
+- **Test Case**: Simulate hot plug events on I2C bus
+- **Expected Behavior**: Bus recovery, error handling
+- **Verification**: Bus free detection, restart capability
+
+### 11. SMBus PEC Error Injection
+- **Scenario**: PEC byte corruption in SMBus packets
+- **Test Case**: Modify PEC byte to cause mismatch
+- **Expected Behavior**: PEC error detection, NACK response
+- **Verification**: PEC validation logic, error reporting
+
+### 12. JTAG Debug Interference
+- **Scenario**: JTAG operations during active I2C transactions
+- **Test Case**: Debug register access while bus is active
+- **Expected Behavior**: No interference with I2C operation
+- **Verification**: Timing isolation, debug port independence
+
+### 13. DMA Boundary Conditions
+- **Scenario**: DMA transfers at buffer boundaries
+- **Test Case**: Transfers ending at FIFO limits
+- **Expected Behavior**: Proper wrap-around or boundary handling
+- **Verification**: DMA completion flags, data integrity
+
+### 14. Temperature and Voltage Variations
+- **Scenario**: Operation under extreme conditions
+- **Test Case**: Simulate PVT corners in simulation
+- **Expected Behavior**: Reliable operation within spec limits
+- **Verification**: Timing closure, functionality preservation
+
+### 15. Concurrent Interrupt Handling
+- **Scenario**: Multiple interrupts occur simultaneously
+- **Test Case**: Bus error + transmission complete + address match
+- **Expected Behavior**: Priority-based handling, no interrupt loss
+- **Verification**: Interrupt controller logic, priority resolution
+
 ## Performance Benchmarking
 
 ### Throughput Testing
