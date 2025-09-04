@@ -174,14 +174,16 @@ i2c_write(CTRL, (1 << MASTER_EN) | (1 << FAST_MODE) | (1 << EN));
 | Bit | Field | Access | Reset | Description |
 |-----|-------|--------|-------|-------------|
 | 31:8 | Reserved | - | 0 | Reserved |
-| 7 | REDUNDANCY_EN | R/W | 0 | Enable redundant channels |
-| 6 | WATCHDOG_EN | R/W | 0 | Enable watchdog timer |
-| 5 | CRC_EN | R/W | 0 | Enable CRC checking |
-| 4 | PARITY_EN | R/W | 0 | Enable parity checking |
-| 3 | LOCKSTEP_EN | R/W | 0 | Enable lockstep operation |
-| 2 | ECC_EN | R/W | 0 | Enable error correction |
-| 1 | FSM_CHECK_EN | R/W | 0 | Enable FSM checking |
-| 0 | SAFETY_MODE | R/W | 0 | Safety mode enable |
+| 7 | REDUNDANCY_EN | R/W | 0 | Enable redundant channels (automotive mode) |
+| 6 | WATCHDOG_EN | R/W | 0 | Enable watchdog timer (automotive mode) |
+| 5 | CRC_EN | R/W | 0 | Enable CRC checking (automotive mode) |
+| 4 | PARITY_EN | R/W | 0 | Enable parity checking (automotive mode) |
+| 3 | LOCKSTEP_EN | R/W | 0 | Enable lockstep operation (automotive mode) |
+| 2 | ECC_EN | R/W | 0 | Enable error correction (automotive mode) |
+| 1 | FSM_CHECK_EN | R/W | 0 | Enable FSM checking (automotive mode) |
+| 0 | SAFETY_MODE | R/W | 0 | Global safety mode enable |
+
+**Note**: When AUTOMOTIVE_MODE=0 (synthesis parameter), this register has no effect and all safety features are permanently disabled for optimal resource usage.
 
 ### 4.2.14 Version Register (VERSION) - 0x34
 

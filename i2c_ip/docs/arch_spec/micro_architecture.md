@@ -197,6 +197,48 @@ For automotive applications, additional safety features are implemented:
 - **Watchdog Timer**: Monitors for hangs and resets
 - **Parity Checking**: For data integrity
 
+#### 5.3.3.1 Configurable Safety Implementation
+
+```verilog
+// Conditional compilation for automotive features
+`ifdef AUTOMOTIVE_MODE
+module automotive_safety_wrapper (
+    input clk,
+    input rst_n,
+    // Core signals
+    input [31:0] data_in,
+    output [31:0] data_out,
+    // Safety signals
+    output safety_error,
+    output ecc_error
+);
+
+`ifdef ECC_EN
+    // ECC protection module
+    ecc_protection ecc_inst (
+        .data_in(data_in),
+        .data_out(data_out),
+        .error_detected(ecc_error)
+    );
+`else
+    assign data_out = data_in;
+    assign ecc_error = 0;
+`endif
+
+`ifdef WATCHDOG_EN
+    // Watchdog timer
+    watchdog_timer wd_inst (
+        .clk(clk),
+        .rst_n(rst_n),
+        .feed_signal(/* watchdog feed */),
+        .timeout(safety_error)
+    );
+`endif
+
+endmodule
+`endif // AUTOMOTIVE_MODE
+```
+
 ## 5.4 FIFO Implementation
 
 ### 5.4.1 FIFO Architecture

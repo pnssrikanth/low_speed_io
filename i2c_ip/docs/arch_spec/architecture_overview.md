@@ -21,6 +21,19 @@ graph TB
     H --> L[State Machine]
     I --> M[State Machine]
     J --> N[SCL/SDA Control]
+
+    %% Optional Automotive Blocks
+    A --> O[Automotive Safety Shell]:::optional
+    O --> P[ECC Protection]:::optional
+    O --> Q[Lockstep Comparator]:::optional
+    O --> R[Watchdog Timer]:::optional
+    O --> S[Diagnostic Monitor]:::optional
+
+    classDef optional fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+
+    %% Configuration Control
+    D --> T[Safety Configuration Register]
+    T --> U[Feature Enable/Disable]
 ```
 
 ## 2.2 Module Descriptions
@@ -143,6 +156,34 @@ The IP is highly configurable through Verilog parameters:
 - **Mode Selection**: Master-only, slave-only, or dual mode
 - **Safety Features**: Enable/disable automotive safety mechanisms
 - **Interrupt Count**: Number of interrupt lines
+
+### 2.6.1 Automotive Configuration Parameters
+
+```verilog
+// Synthesis-time parameters for automotive features
+parameter AUTOMOTIVE_MODE = 1,        // 1=Automotive, 0=General-purpose
+parameter SAFETY_LEVEL = "ASIL_B",    // ASIL_A, ASIL_B, ASIL_C, ASIL_D
+parameter REDUNDANCY_EN = 1,          // Enable redundant processing
+parameter ECC_EN = 1,                 // Enable error-correcting codes
+parameter PARITY_EN = 1,              // Enable parity checking
+parameter WATCHDOG_EN = 1,            // Enable watchdog timer
+parameter LOCKSTEP_EN = 1,            // Enable lockstep operation
+parameter DIAGNOSTIC_EN = 1,          // Enable diagnostic features
+parameter FAULT_INJECTION_EN = 0      // Enable fault injection for testing
+```
+
+### 2.6.2 Runtime Configuration
+
+The SAFETY register provides runtime control of automotive features:
+
+- **Bit 7**: REDUNDANCY_EN - Enable/disable redundant channels
+- **Bit 6**: WATCHDOG_EN - Enable/disable watchdog timer
+- **Bit 5**: CRC_EN - Enable/disable CRC checking
+- **Bit 4**: PARITY_EN - Enable/disable parity checking
+- **Bit 3**: LOCKSTEP_EN - Enable/disable lockstep operation
+- **Bit 2**: ECC_EN - Enable/disable error correction
+- **Bit 1**: FSM_CHECK_EN - Enable/disable FSM checking
+- **Bit 0**: SAFETY_MODE - Global safety mode enable
 
 ---
 

@@ -9,10 +9,11 @@ The I2C IP core is a highly configurable, standards-compliant implementation of 
 This IP core includes:
 - Complete I2C master and slave functionality
 - Support for all standard I2C modes (Standard, Fast, Fast Plus, High Speed)
-- Automotive-grade safety features (ISO 26262 ASIL B/C)
+- **Configurable automotive-grade safety features (ISO 26262 ASIL B/C)**
 - ARM AMBA bus integration (APB/AHB)
 - FPGA and ASIC compatibility
 - Open-source implementation with full development environment
+- **Synthesis-time and runtime configuration for automotive vs. general-purpose use**
 
 ## 1.3 Key Features
 
@@ -31,6 +32,7 @@ This IP core includes:
 - **Fault Tolerance**: Built-in redundancy and recovery mechanisms
 - **Diagnostics**: Self-test and monitoring capabilities
 - **Automotive Compliance**: AEC-Q100 qualification and ISO 26262 functional safety
+- **Configurable Safety**: Enable/disable automotive safety features for optimal resource usage
 
 ### Integration
 - **Bus Interfaces**: APB 3.0 and AHB-Lite support
@@ -73,6 +75,29 @@ The IP core is designed with the following principles:
 3. **Portability**: Technology-independent design for FPGA and ASIC
 4. **Safety**: Built-in safety mechanisms for critical applications
 5. **Efficiency**: Optimized resource usage and power consumption
+6. **Flexible Safety**: Configurable automotive features to balance safety vs. resource usage
+
+## 1.7 Configurable Automotive Support
+
+The IP core supports two primary configuration modes:
+
+### 1.7.1 Automotive Mode
+- Full ISO 26262 ASIL B/C compliance
+- Complete safety mechanism suite (ECC, parity, lockstep, etc.)
+- Enhanced diagnostics and fault monitoring
+- Redundant processing paths
+- Comprehensive error recovery
+
+### 1.7.2 General-Purpose Mode
+- Reduced feature set for non-safety-critical applications
+- Minimal safety overhead for optimal area/power efficiency
+- Core I2C functionality preserved
+- Backward compatibility maintained
+
+### 1.7.3 Configuration Methods
+- **Synthesis Parameters**: Compile-time feature selection
+- **Runtime Registers**: Dynamic enable/disable of features
+- **Conditional Compilation**: Verilog `ifdef directives for optional modules
 
 ## 1.7 Assumptions and Constraints
 

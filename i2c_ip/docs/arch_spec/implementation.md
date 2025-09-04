@@ -146,7 +146,16 @@ module i2c_ip_core #(
     parameter FIFO_DEPTH = 16,      // TX/RX FIFO depth
     parameter MODE = "DUAL",        // Operation mode
     parameter SAFETY_EN = 1,        // Safety features enable
-    parameter TIMING_EN = 1         // Timing violation detection
+    parameter TIMING_EN = 1,        // Timing violation detection
+    // Automotive configuration parameters
+    parameter AUTOMOTIVE_MODE = 1,  // 1=Automotive, 0=General-purpose
+    parameter SAFETY_LEVEL = "ASIL_B", // ASIL level
+    parameter REDUNDANCY_EN = 1,    // Enable redundancy
+    parameter ECC_EN = 1,           // Enable ECC
+    parameter PARITY_EN = 1,        // Enable parity
+    parameter WATCHDOG_EN = 1,      // Enable watchdog
+    parameter LOCKSTEP_EN = 1,      // Enable lockstep
+    parameter DIAGNOSTIC_EN = 1     // Enable diagnostics
 )(
     // Port list
 );
@@ -242,6 +251,19 @@ set_retention i2c_ret -domain PD_I2C -retention_power_net VDD_I2C -retention_gro
 | Basic (Master-only) | 300 | 150 | 0 | 5-8 |
 | Standard (Dual-mode) | 500 | 250 | 1 | 8-12 |
 | Full Featured | 800 | 400 | 2 | 12-18 |
+| **General-Purpose (No Safety)** | 350 | 180 | 0.5 | 6-9 |
+| **Automotive Full Safety** | 1200 | 600 | 3 | 18-25 |
+
+#### 7.7.1.1 Automotive vs. General-Purpose Area Comparison
+
+| Feature | Automotive Mode | General-Purpose Mode | Savings |
+|---------|-----------------|----------------------|---------|
+| ECC Protection | 150 LUTs, 80 regs | 0 | 150 LUTs, 80 regs |
+| Lockstep Comparator | 200 LUTs, 120 regs | 0 | 200 LUTs, 120 regs |
+| Watchdog Timer | 50 LUTs, 30 regs | 0 | 50 LUTs, 30 regs |
+| Diagnostic Monitor | 100 LUTs, 60 regs | 0 | 100 LUTs, 60 regs |
+| Redundant FIFOs | 100 LUTs, 50 regs | 0 | 100 LUTs, 50 regs |
+| **Total Savings** | **600 LUTs, 340 regs** | **0** | **600 LUTs, 340 regs** |
 
 ### 7.7.2 Timing Performance
 
@@ -259,6 +281,16 @@ set_retention i2c_ret -domain PD_I2C -retention_power_net VDD_I2C -retention_gro
 | 28nm ASIC | 0.9 | 15-25 | 50-100 |
 | 14nm ASIC | 0.8 | 10-18 | 20-50 |
 | FPGA (Xilinx) | 1.0 | 20-35 | 100-200 |
+
+#### 7.7.3.1 Automotive vs. General-Purpose Power Comparison
+
+| Configuration | Active Power (mW) | Leakage (μW) | Savings |
+|---------------|-------------------|--------------|---------|
+| **Automotive Full Safety** | 25-35 | 80-120 | - |
+| **General-Purpose (No Safety)** | 12-18 | 30-60 | **13-17 mW active, 50-60 μW leakage** |
+| **Automotive Safety Disabled (Runtime)** | 15-22 | 40-70 | **10-13 mW active, 40-50 μW leakage** |
+
+*Note: Runtime disabling of safety features provides intermediate power savings while maintaining hardware for potential re-enablement.*
 
 ## 7.7 Test and Debug
 

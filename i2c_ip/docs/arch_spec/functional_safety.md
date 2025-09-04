@@ -2,9 +2,37 @@
 
 ## 6.1 Safety Overview
 
-The I2C IP core implements functional safety mechanisms compliant with ISO 26262 for automotive applications. The design targets ASIL B classification with optional ASIL C/D features.
+The I2C IP core implements functional safety mechanisms compliant with ISO 26262 for automotive applications. The design targets ASIL B classification with optional ASIL C/D features. All safety features are configurable to allow optimal resource usage for non-automotive applications while maintaining backward compatibility.
 
 ## 6.2 Safety Mechanisms
+
+### 6.2.0 Configurable Safety Features
+
+The IP core provides extensive configurability for safety features:
+
+#### 6.2.0.1 Synthesis-Time Configuration
+```verilog
+// Safety feature enable/disable parameters
+parameter AUTOMOTIVE_MODE = 1,      // Global automotive mode
+parameter REDUNDANCY_EN = 1,        // Enable redundant processing
+parameter ECC_EN = 1,               // Enable ECC protection
+parameter PARITY_EN = 1,            // Enable parity checking
+parameter WATCHDOG_EN = 1,          // Enable watchdog timer
+parameter LOCKSTEP_EN = 1,          // Enable lockstep operation
+parameter DIAGNOSTIC_EN = 1,        // Enable diagnostic features
+parameter FAULT_INJECTION_EN = 0    // Enable fault injection (test mode)
+```
+
+#### 6.2.0.2 Runtime Configuration
+Safety features can be enabled/disabled at runtime through the SAFETY register:
+- **REDUNDANCY_EN**: Enable/disable redundant channels
+- **WATCHDOG_EN**: Enable/disable watchdog timer
+- **CRC_EN**: Enable/disable CRC checking
+- **PARITY_EN**: Enable/disable parity checking
+- **LOCKSTEP_EN**: Enable/disable lockstep operation
+- **ECC_EN**: Enable/disable error correction
+- **FSM_CHECK_EN**: Enable/disable FSM checking
+- **SAFETY_MODE**: Global safety mode enable
 
 ### 6.2.1 Fault Detection
 

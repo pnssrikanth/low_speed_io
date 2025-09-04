@@ -132,6 +132,80 @@ endmodule
 | TC_603 | Diagnostic coverage | > 90% coverage |
 | TC_604 | ASIL compliance | Meet requirements |
 
+### 9.2.5 Configuration Tests
+
+#### 9.2.5.1 Automotive Mode Tests
+
+| Test Case | Description | Expected Result |
+|-----------|-------------|-----------------|
+| TC_701 | Automotive mode synthesis | All safety features enabled |
+| TC_702 | Safety register configuration | Features enable/disable correctly |
+| TC_703 | Lockstep operation | Redundant processing active |
+| TC_704 | ECC protection | Error correction working |
+| TC_705 | Watchdog timer | Timeout detection active |
+
+#### 9.2.5.2 General-Purpose Mode Tests
+
+| Test Case | Description | Expected Result |
+|-----------|-------------|-----------------|
+| TC_801 | General-purpose synthesis | Safety features disabled |
+| TC_802 | Minimal resource usage | Optimal area/power consumption |
+| TC_803 | Core functionality | I2C operations work correctly |
+| TC_804 | Backward compatibility | Existing software unchanged |
+| TC_805 | Safety register ignored | No effect in GP mode |
+
+## 9.2.6 Configuration Mode Testing
+
+### 9.2.6.1 Synthesis Configuration Testing
+
+The IP core supports multiple synthesis configurations:
+
+```verilog
+// Testbench for different configurations
+module config_testbench;
+
+// Automotive mode configuration
+`ifdef AUTOMOTIVE_MODE
+    `define EXPECT_SAFETY_FEATURES 1
+`else
+    `define EXPECT_SAFETY_FEATURES 0
+`endif
+
+// Test different parameter combinations
+i2c_ip_core #(
+    .AUTOMOTIVE_MODE(`AUTOMOTIVE_MODE),
+    .REDUNDANCY_EN(1),
+    .ECC_EN(1),
+    .WATCHDOG_EN(1)
+) automotive_dut (/* ports */);
+
+i2c_ip_core #(
+    .AUTOMOTIVE_MODE(0),
+    .REDUNDANCY_EN(0),
+    .ECC_EN(0),
+    .WATCHDOG_EN(0)
+) gp_dut (/* ports */);
+
+endmodule
+```
+
+### 9.2.6.2 Runtime Configuration Testing
+
+```verilog
+// Test runtime safety feature enable/disable
+task test_runtime_safety_config;
+    // Enable all safety features
+    write_register(SAFETY_REG, 32'hFF);
+    // Verify features are active
+    // ... test safety mechanisms
+
+    // Disable safety features
+    write_register(SAFETY_REG, 32'h00);
+    // Verify features are inactive
+    // ... test normal operation
+endtask
+```
+
 ## 9.3 Testbench Architecture
 
 ### 9.3.1 I2C Slave Model
@@ -198,8 +272,21 @@ covergroup i2c_coverage @(posedge clk);
         bins bus_stuck = {BUS_STUCK};
     }
 
+    // Configuration coverage
+    cp_automotive_mode: coverpoint automotive_mode {
+        bins automotive = {1};
+        bins general_purpose = {0};
+    }
+
+    cp_safety_features: coverpoint safety_features {
+        bins none = {8'h00};
+        bins all = {8'hFF};
+        bins partial = {[8'h01:8'hFE]};
+    }
+
     cross_mode_speed: cross cp_mode, cp_speed;
     cross_mode_error: cross cp_mode, cp_error;
+    cross_config_mode: cross cp_automotive_mode, cp_safety_features;
 endgroup
 ```
 
@@ -304,9 +391,14 @@ test_suite/
 ├── performance/
 │   ├── throughput/
 │   └── latency/
-└── safety/
-    ├── fault_injection/
-    └── diagnostic/
+├── safety/
+│   ├── fault_injection/
+│   └── diagnostic/
+└── configuration/
+    ├── automotive_mode/
+    ├── general_purpose_mode/
+    ├── runtime_config/
+    └── parameter_sweep/
 ```
 
 ### 9.6.2 Automated Regression
