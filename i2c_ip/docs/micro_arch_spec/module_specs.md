@@ -35,7 +35,7 @@ This document details the internal modules of the I2C IP core, their interconnec
 **Key Features**:
 - Configurable SCL frequency generation
 - Clock stretching support
-- Synchronization with system clock
+- Synchronization with APB clock (PCLK)
 - Duty cycle control
 
 **Parameters**:
@@ -43,11 +43,18 @@ This document details the internal modules of the I2C IP core, their interconnec
 - `STRETCH_EN`: Enable clock stretching (default: 1)
 
 **Interface**:
-- Input: `sys_clk`, `enable`, `stretch_req`
-- Output: `scl_out`, `scl_oe`, `timing_valid`
+- Input: `i_sys_clk` (PCLK), `i_rst_n` (PRESETn), `i_enable`, `i_stretch_req`
+- Output: `o_scl_out`, `o_scl_oe`, `o_timing_valid`
 
 ### 2. Register Bank
-**Purpose**: Stores configuration, status, and data registers.
+**Purpose**: Stores configuration, status, and data registers with APB interface.
+
+**APB Interface Features**:
+- AMBA APB slave implementation
+- 32-bit address and data buses
+- Single-cycle register access
+- Address validation and error reporting
+- Register map spanning 0x00-0x14 address range
 
 **Register Map**:
 | Address | Name | Access | Description |
@@ -80,6 +87,10 @@ This document details the internal modules of the I2C IP core, their interconnec
 
 ### 3. Control FSM Module
 **Purpose**: Manages the overall operation flow and state transitions.
+
+**Interface**:
+- Input: `i_sys_clk` (PCLK), `i_rst_n` (PRESETn), control signals from register bank
+- Output: Control signals to shift register, clock manager, and I2C bus
 
 **States** (Master Mode)**:
 - IDLE: Waiting for start command
@@ -115,6 +126,10 @@ This document details the internal modules of the I2C IP core, their interconnec
 **Parameters**:
 - `DATA_WIDTH`: Data width (default: 8)
 - `SHIFT_DIR`: Shift direction (0: LSB first, 1: MSB first)
+
+**Interface**:
+- Input: `i_sys_clk` (PCLK), `i_rst_n` (PRESETn), control signals from FSM
+- Output: Serial data to I2C bus, parallel data to register bank
 
 ### 5. I/O Buffer Interface (External)
 **Purpose**: Provides control signals for external I2C bus IO buffers managed by SoC integration.

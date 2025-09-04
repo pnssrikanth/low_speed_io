@@ -1,9 +1,42 @@
 # Interface Details
 
 ## Overview
-This document describes the external interfaces of the I2C IP core, including pin definitions, signal protocols, and timing diagrams. The IP core supports both master and slave modes with configurable I/O standards. Note that I2C bus IO buffers are external to the IP core and handled by SoC integration, with the IP providing control signals for buffer management.
+This document describes the external interfaces of the I2C IP core, including AMBA APB bus interface, I2C bus signals, and timing diagrams. The IP core implements a fully compliant AMBA APB (Advanced Peripheral Bus) slave interface for register access and supports both master and slave I2C modes with configurable I/O standards. I2C bus IO buffers are external to the IP core and handled by SoC integration, with the IP providing control signals for buffer management.
 
-## Pin Interface
+## AMBA APB Interface
+
+### APB Slave Signals
+The IP core implements a standard AMBA APB slave interface for register access and configuration.
+
+| Signal | Direction | Description | Width |
+|--------|-----------|-------------|-------|
+| `PCLK` | Input | APB Clock | 1 |
+| `PRESETn` | Input | APB Reset (active low) | 1 |
+| `PADDR[31:0]` | Input | APB Address Bus | 32 |
+| `PSEL` | Input | APB Select | 1 |
+| `PENABLE` | Input | APB Enable | 1 |
+| `PWRITE` | Input | APB Write Enable | 1 |
+| `PWDATA[31:0]` | Input | APB Write Data | 32 |
+| `PRDATA[31:0]` | Output | APB Read Data | 32 |
+| `PREADY` | Output | APB Ready | 1 |
+| `PSLVERR` | Output | APB Slave Error | 1 |
+
+### APB Protocol Implementation
+- **Transfer Types**: Supports both read and write transfers
+- **Address Space**: 32-bit address space with register mapping in lower 8 bits
+- **Timing**: Single-cycle register access (PREADY always asserted for immediate response)
+- **Error Handling**: PSLVERR asserted for invalid register addresses
+- **Byte Enable**: Not implemented (32-bit word transfers only)
+
+### APB Transfer Sequence
+```
+1. SETUP Phase: PSEL=1, PENABLE=0, PADDR/PWRITE/PWDATA valid
+2. ACCESS Phase: PSEL=1, PENABLE=1, transfer completes
+3. PREADY=1 indicates transfer completion
+4. PSLVERR=1 indicates address error
+```
+
+## I2C Bus Interface
 
 ### I2C Bus Signals (External IO Buffer Interface)
 | Signal | Direction | Description | Width |
@@ -15,33 +48,10 @@ This document describes the external interfaces of the I2C IP core, including pi
 | `sda_oe` | Output | Serial Data Output Enable | 1 |
 | `sda_in` | Input | Serial Data Input from IO Buffer | 1 |
 
-### Control and Status Signals
+### Interrupt Interface
 | Signal | Direction | Description | Width |
 |--------|-----------|-------------|-------|
-| `clk` | Input | System Clock | 1 |
-| `rst_n` | Input | Active Low Reset | 1 |
-| `enable` | Input | IP Core Enable | 1 |
-| `mode` | Input | Operation Mode (0: Slave, 1: Master) | 1 |
-| `speed_mode` | Input | I2C Speed Mode (00: Standard, 01: Fast, 10: Fast Plus, 11: High Speed) | 2 |
-| `irq` | Output | Interrupt Request | 1 |
-| `busy` | Output | IP Core Busy Status | 1 |
-
-### Data Interface
-| Signal | Direction | Description | Width |
-|--------|-----------|-------------|-------|
-| `data_in` | Input | Data to Transmit | 8 |
-| `data_out` | Output | Received Data | 8 |
-| `addr` | Input | Slave Address (for Master mode) or Device Address (for Slave mode) | 7 |
-| `rw` | Input | Read/Write Operation (0: Write, 1: Read) | 1 |
-| `start_tx` | Input | Start Transmission | 1 |
-| `tx_done` | Output | Transmission Complete | 1 |
-| `rx_done` | Output | Reception Complete | 1 |
-
-### Configuration Signals
-| Signal | Direction | Description | Width |
-|--------|-----------|-------------|-------|
-| `config_reg` | Input | Configuration Register | 32 |
-| `status_reg` | Output | Status Register | 32 |
+| `o_irq` | Output | Interrupt Request | 1 |
 
 ## Signal Protocols
 
@@ -96,53 +106,89 @@ SDA:  XXXXXXXX|START| A6-A0 |R/W|ACK| D7-D0 |ACK|STOP|XXXXXXXX
 | t_BUF | 4.7 μs | 1.3 μs | 0.5 μs | 0.16 μs |
 
 ## Clock Domain Considerations
-- All internal logic operates in the `clk` domain
-- I2C bus signals are asynchronous to the system clock
+- All internal logic operates in the `PCLK` domain
+- I2C bus signals are asynchronous to the APB clock
 - Synchronization modules required for crossing clock domains
 - Metastability protection for all asynchronous inputs
 
 ## Reset Behavior
-- Active low reset (`rst_n`) initializes all internal states
+- Active low reset (`PRESETn`) initializes all internal states
 - I2C bus lines released to high-impedance during reset
 - Configuration registers reset to default values
 - Ongoing transactions aborted on reset
+- APB interface responds with PREADY=1 and PSLVERR=0 during reset
+
+## Register Map and APB Address Space
+
+### Register Address Mapping
+All registers are accessible through the APB interface using 32-bit addressing. The register map uses the lower 8 bits of the address space.
+
+| APB Address | Register | Access | Description |
+|-------------|----------|--------|-------------|
+| 0x00000000 | CTRL | RW | Control Register |
+| 0x00000004 | STATUS | RO | Status Register |
+| 0x00000008 | DATA | RW | Data Register |
+| 0x0000000C | ADDR | RW | Address Register |
+| 0x00000010 | CONFIG | RW | Configuration Register |
+| 0x00000014 | TIMING | RW | Timing Register |
+
+### Register Access Rules
+- **Read Access**: PWRITE=0, valid data returned on PRDATA
+- **Write Access**: PWRITE=1, data from PWDATA written to register
+- **Invalid Addresses**: PSLVERR=1 for addresses outside 0x00-0x14 range
+- **Access Time**: Single-cycle (PREADY=1 always for immediate response)
 
 ## Interrupt Generation
-The `irq` signal is asserted for the following events:
+The `o_irq` signal is asserted for the following events:
 - Transmission complete
 - Reception complete
 - Arbitration loss
 - Bus error detection
 - Slave address match (in slave mode)
 
-### Interrupt Prioritization
-The IP core supports multiple interrupt sources with configurable priority levels. Interrupt prioritization ensures critical events are handled first.
+### Interrupt Configuration
+Interrupt behavior is controlled through the CTRL register:
+- **Interrupt Enable**: Bit 6 of CTRL register enables/disables interrupts
+- **Status Flags**: STATUS register contains individual interrupt flags
+- **Clear on Read**: Status flags are cleared when STATUS register is read
 
-**Interrupt Sources and Priorities:**
-| Interrupt Source | Priority Level | Description |
-|------------------|----------------|-------------|
-| Bus Error | Highest (0) | Critical bus faults requiring immediate attention |
-| Arbitration Loss | High (1) | Multi-master arbitration failure |
-| Slave Address Match | Medium (2) | Slave mode address recognition |
-| Transmission Complete | Medium (3) | TX operation finished |
-| Reception Complete | Low (4) | RX operation finished |
-
-**Priority Resolution:**
-- Fixed priority scheme: Lower number = higher priority
-- Interrupt masking available per source
-- Priority can be reconfigured via configuration registers
-- Nested interrupt support for complex scenarios
-
-**Interrupt Controller Interface:**
-- `irq_mask[4:0]`: Individual interrupt mask bits
-- `irq_pend[4:0]`: Pending interrupt status
-- `irq_ack`: Interrupt acknowledge signal
-- `irq_vector[2:0]`: Encoded interrupt vector for priority
+### Interrupt Sources
+| Interrupt Source | Status Bit | Description |
+|------------------|------------|-------------|
+| Transmission Complete | STATUS[0] | TX operation finished |
+| Reception Complete | STATUS[1] | RX operation finished |
+| Arbitration Lost | STATUS[2] | Multi-master arbitration failure |
+| NACK Received | STATUS[3] | Slave sent NACK |
+| Bus Error | STATUS[4] | I2C bus error detected |
+| Start Detected | STATUS[5] | START condition detected |
+| Stop Detected | STATUS[6] | STOP condition detected |
 
 ## Power Management
-- Low power modes supported through `enable` signal
-- Clock gating for unused modules
+- Low power modes controlled through CTRL register (bit 0: ENABLE)
+- Clock gating for unused modules when ENABLE=0
 - Retention of configuration during power down
+- APB interface remains accessible in all power states
+- I2C bus lines released to high-impedance when disabled
+
+## APB Integration Guidelines
+
+### SoC Integration
+- Connect PCLK to system APB clock
+- Connect PRESETn to system reset (active low)
+- PADDR[31:0] supports full 32-bit address decoding
+- PREADY always asserted (single-cycle access)
+- PSLVERR indicates invalid register access
+
+### APB Master Requirements
+- Support for 32-bit address and data buses
+- Handle PREADY and PSLVERR signals
+- Single transfer per access (no burst support)
+
+### Timing Considerations
+- APB transfers complete in single clock cycle
+- No wait states required (PREADY=1)
+- Setup time: PSEL/PENABLE before data valid
+- Hold time: Signals stable until PREADY asserted
 
 ---
 

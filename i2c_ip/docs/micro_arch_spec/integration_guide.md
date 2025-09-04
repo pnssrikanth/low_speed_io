@@ -38,37 +38,30 @@ module soc_top (
     // Other SoC signals...
 );
 
-    // I2C IP instantiation
-    i2c_master i2c_inst (
-        .clk(sys_clk),
-        .rst_n(sys_rst_n),
-        .scl_in(i2c_scl_in),
-        .scl_out(i2c_scl_out),
-        .scl_oe(i2c_scl_oe),
-        .sda_in(i2c_sda_in),
-        .sda_out(i2c_sda_out),
-        .sda_oe(i2c_sda_oe),
-        .irq(i2c_irq),
-        // ... other connections
-    );
+    // I2C IP instantiation with APB interface
+    i2c_top i2c_inst (
+        // APB Interface
+        .PCLK(apb_pclk),
+        .PRESETn(apb_presetn),
+        .PADDR(apb_paddr),
+        .PSEL(apb_psel),
+        .PENABLE(apb_penable),
+        .PWRITE(apb_pwrite),
+        .PWDATA(apb_pwdata),
+        .PRDATA(apb_prdata),
+        .PREADY(apb_pready),
+        .PSLVERR(apb_pslverr),
 
-    // APB bridge to I2C registers
-    apb_to_i2c_bridge bridge_inst (
-        .apb_pclk(apb_pclk),
-        .apb_presetn(apb_presetn),
-        .apb_paddr(apb_paddr[7:0]), // 256-byte address space
-        .apb_pwrite(apb_pwrite),
-        .apb_pwdata(apb_pwdata),
-        .apb_psel(apb_psel),
-        .apb_penable(apb_penable),
-        .apb_prdata(apb_prdata),
-        .apb_pready(apb_pready),
-        .apb_pslverr(apb_pslverr),
-        // I2C register interface
-        .i2c_reg_addr(i2c_reg_addr),
-        .i2c_reg_write(i2c_reg_write),
-        .i2c_reg_wdata(i2c_reg_wdata),
-        .i2c_reg_rdata(i2c_reg_rdata)
+        // I2C Bus Interface
+        .i_sda_in(i2c_sda_in),
+        .i_scl_in(i2c_scl_in),
+        .o_sda_out(i2c_sda_out),
+        .o_sda_oe(i2c_sda_oe),
+        .o_scl_out(i2c_scl_out),
+        .o_scl_oe(i2c_scl_oe),
+
+        // Interrupt
+        .o_irq(i2c_irq)
     );
 
 endmodule
@@ -178,40 +171,35 @@ endmodule
 ## Register Interface
 
 ### APB Register Map
-| Address Offset | Register Name | Access | Description |
-|----------------|---------------|--------|-------------|
-| 0x00 | CTRL | RW | Control Register |
-| 0x04 | STATUS | RO | Status Register |
-| 0x08 | DATA | RW | Data Register |
-| 0x0C | ADDR | RW | Address Register |
-| 0x10 | CONFIG | RW | Configuration Register |
-| 0x14 | TIMING | RW | Timing Parameters |
-| 0x18 | INT_EN | RW | Interrupt Enable |
-| 0x1C | INT_STATUS | RO | Interrupt Status |
-| 0x20 | FIFO_CTRL | RW | FIFO Control |
-| 0x24 | FIFO_STATUS | RO | FIFO Status |
-| 0x28 | ERROR_STATUS | RO | Error Status |
-| 0x2C | DEBUG | RW | Debug Register |
+| APB Address | Register Name | Access | Description |
+|-------------|---------------|--------|-------------|
+| 0x00000000 | CTRL | RW | Control Register |
+| 0x00000004 | STATUS | RO | Status Register |
+| 0x00000008 | DATA | RW | Data Register |
+| 0x0000000C | ADDR | RW | Address Register |
+| 0x00000010 | CONFIG | RW | Configuration Register |
+| 0x00000014 | TIMING | RW | Timing Register |
 
 ### Register Descriptions
 
-#### Control Register (CTRL) - 0x00
+#### Control Register (CTRL) - 0x00000000
 ```c
 typedef union {
     struct {
         uint32_t enable      : 1;  // Bit 0: IP enable
-        uint32_t start       : 1;  // Bit 1: Start transmission
-        uint32_t stop        : 1;  // Bit 2: Stop transmission
+        uint32_t start_tx    : 1;  // Bit 1: Start transmission (pulse)
+        uint32_t stop_tx     : 1;  // Bit 2: Stop transmission (pulse)
         uint32_t ack_en      : 1;  // Bit 3: ACK enable
-        uint32_t mode        : 2;  // Bits 4-5: Operation mode
-        uint32_t speed_mode  : 2;  // Bits 6-7: Speed mode
+        uint32_t mode        : 2;  // Bits 4-5: Operation mode (00:idle, 01:master TX, 10:master RX, 11:slave)
+        uint32_t int_en      : 1;  // Bit 6: Interrupt enable
+        uint32_t rst         : 1;  // Bit 7: Software reset
         uint32_t reserved    : 24; // Bits 8-31: Reserved
     } fields;
     uint32_t value;
 } i2c_ctrl_reg_t;
 ```
 
-#### Status Register (STATUS) - 0x04
+#### Status Register (STATUS) - 0x00000004
 ```c
 typedef union {
     struct {
@@ -220,9 +208,9 @@ typedef union {
         uint32_t rx_done     : 1;  // Bit 2: Reception complete
         uint32_t arb_lost    : 1;  // Bit 3: Arbitration lost
         uint32_t nack        : 1;  // Bit 4: NACK received
-        uint32_t bus_error   : 1;  // Bit 5: Bus error
-        uint32_t fifo_full   : 1;  // Bit 6: TX FIFO full
-        uint32_t fifo_empty  : 1;  // Bit 7: RX FIFO empty
+        uint32_t bus_err     : 1;  // Bit 5: Bus error
+        uint32_t start_det   : 1;  // Bit 6: START condition detected
+        uint32_t stop_det    : 1;  // Bit 7: STOP condition detected
         uint32_t reserved    : 24; // Bits 8-31: Reserved
     } fields;
     uint32_t value;
@@ -239,14 +227,12 @@ typedef union {
 #define I2C_BASE_ADDR 0x40005000
 
 typedef struct {
-    volatile uint32_t CTRL;
-    volatile uint32_t STATUS;
-    volatile uint32_t DATA;
-    volatile uint32_t ADDR;
-    volatile uint32_t CONFIG;
-    volatile uint32_t TIMING;
-    volatile uint32_t INT_EN;
-    volatile uint32_t INT_STATUS;
+    volatile uint32_t CTRL;      // 0x00: Control Register
+    volatile uint32_t STATUS;    // 0x04: Status Register
+    volatile uint32_t DATA;      // 0x08: Data Register
+    volatile uint32_t ADDR;      // 0x0C: Address Register
+    volatile uint32_t CONFIG;    // 0x10: Configuration Register
+    volatile uint32_t TIMING;    // 0x14: Timing Register
 } i2c_regs_t;
 
 #define I2C ((i2c_regs_t *)I2C_BASE_ADDR)
@@ -261,28 +247,34 @@ uint32_t i2c_get_status(void);
 
 ### Initialization Function
 ```c
+#define I2C_CTRL_ENABLE     (1 << 0)
+#define I2C_CTRL_INT_EN     (1 << 6)
+#define I2C_SPEED_STANDARD  0x00
+#define I2C_SPEED_FAST      0x01
+#define I2C_SPEED_FAST_PLUS 0x02
+
 void i2c_init(uint32_t speed_mode) {
     // Reset I2C IP
     I2C->CTRL = 0;
 
-    // Configure speed mode
+    // Configure speed mode in CONFIG register
     I2C->CONFIG = speed_mode;
 
-    // Set timing parameters based on speed
+    // Set timing parameters (divider values) based on speed
     switch (speed_mode) {
         case I2C_SPEED_STANDARD:
-            I2C->TIMING = 0x00000064; // 100 kHz timing
+            I2C->TIMING = 100;  // Divider for 100 kHz
             break;
         case I2C_SPEED_FAST:
-            I2C->TIMING = 0x00000019; // 400 kHz timing
+            I2C->TIMING = 25;   // Divider for 400 kHz
             break;
         case I2C_SPEED_FAST_PLUS:
-            I2C->TIMING = 0x0000000A; // 1 MHz timing
+            I2C->TIMING = 10;   // Divider for 1 MHz
             break;
     }
 
-    // Enable interrupts
-    I2C->INT_EN = I2C_INT_TX_DONE | I2C_INT_RX_DONE | I2C_INT_ERROR;
+    // Enable interrupts in CTRL register
+    I2C->CTRL |= I2C_CTRL_INT_EN;
 
     // Enable I2C IP
     I2C->CTRL |= I2C_CTRL_ENABLE;
@@ -291,30 +283,44 @@ void i2c_init(uint32_t speed_mode) {
 
 ### Write Transaction
 ```c
-bool i2c_write(uint8_t slave_addr, uint8_t *data, uint32_t len) {
-    uint32_t timeout = I2C_TIMEOUT;
+#define I2C_CTRL_START_TX   (1 << 1)
+#define I2C_STATUS_BUSY     (1 << 0)
+#define I2C_STATUS_TX_DONE  (1 << 1)
+#define I2C_STATUS_NACK     (1 << 4)
 
-    // Set slave address
+bool i2c_write(uint8_t slave_addr, uint8_t *data, uint32_t len) {
+    uint32_t timeout = 100000;  // Timeout counter
+
+    // Set slave address (7-bit)
     I2C->ADDR = slave_addr & 0x7F;
 
+    // Set mode to Master TX (01)
+    I2C->CTRL = (I2C->CTRL & ~(0x3 << 4)) | (0x1 << 4);
+
     // Start transmission
-    I2C->CTRL |= I2C_CTRL_START;
+    I2C->CTRL |= I2C_CTRL_START_TX;
 
     for (uint32_t i = 0; i < len; i++) {
-        // Wait for TX ready
-        while ((I2C->STATUS & I2C_STATUS_TX_READY) == 0) {
-            if (--timeout == 0) return false;
-        }
+        // Wait for not busy (previous byte sent)
+        while ((I2C->STATUS & I2C_STATUS_BUSY) && --timeout);
+
+        if (timeout == 0) return false;
 
         // Write data
         I2C->DATA = data[i];
+
+        // Start transmission for this byte
+        I2C->CTRL |= I2C_CTRL_START_TX;
     }
 
     // Wait for transmission complete
-    timeout = I2C_TIMEOUT;
-    while ((I2C->STATUS & I2C_STATUS_TX_DONE) == 0) {
-        if (--timeout == 0) return false;
-    }
+    timeout = 100000;
+    while ((I2C->STATUS & I2C_STATUS_BUSY) && --timeout);
+
+    if (timeout == 0) return false;
+
+    // Check for NACK
+    if (I2C->STATUS & I2C_STATUS_NACK) return false;
 
     return true;
 }
@@ -322,26 +328,32 @@ bool i2c_write(uint8_t slave_addr, uint8_t *data, uint32_t len) {
 
 ### Interrupt Handler
 ```c
-void I2C_IRQHandler(void) {
-    uint32_t int_status = I2C->INT_STATUS;
+#define I2C_STATUS_TX_DONE  (1 << 1)
+#define I2C_STATUS_RX_DONE  (1 << 2)
+#define I2C_STATUS_ARB_LOST (1 << 3)
+#define I2C_STATUS_NACK     (1 << 4)
+#define I2C_STATUS_BUS_ERR  (1 << 5)
 
-    if (int_status & I2C_INT_TX_DONE) {
+void I2C_IRQHandler(void) {
+    uint32_t status = I2C->STATUS;
+
+    if (status & I2C_STATUS_TX_DONE) {
         // Transmission complete
         tx_complete_callback();
     }
 
-    if (int_status & I2C_INT_RX_DONE) {
+    if (status & I2C_STATUS_RX_DONE) {
         // Reception complete
         rx_complete_callback();
     }
 
-    if (int_status & I2C_INT_ERROR) {
+    if (status & (I2C_STATUS_ARB_LOST | I2C_STATUS_NACK | I2C_STATUS_BUS_ERR)) {
         // Error occurred
         error_callback();
     }
 
-    // Clear interrupts
-    I2C->INT_STATUS = int_status;
+    // Status bits are cleared automatically when read
+    // No explicit clearing needed
 }
 ```
 
@@ -391,15 +403,18 @@ endmodule
 ### Device Tree Entry (Linux)
 ```dts
 i2c@40005000 {
-    compatible = "vendor,i2c-master";
-    reg = <0x40005000 0x100>;
+    compatible = "vendor,i2c-apb";
+    reg = <0x40005000 0x18>;  // 6 registers * 4 bytes = 24 bytes (0x18)
     interrupts = <15 0>;
-    clocks = <&sys_clk>;
-    clock-names = "i2c";
+    clocks = <&apb_clk>;
+    clock-names = "apb";
     pinctrl-names = "default";
     pinctrl-0 = <&i2c_pins>;
     #address-cells = <1>;
     #size-cells = <0>;
+
+    /* I2C timing parameters */
+    clock-frequency = <400000>;  /* 400 kHz */
 
     eeprom@50 {
         compatible = "atmel,24c256";

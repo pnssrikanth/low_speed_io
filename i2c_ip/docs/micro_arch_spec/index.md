@@ -50,6 +50,7 @@ This specification is organized into multiple documents for clarity and ease of 
 ## Revision History
 | Version | Date | Description |
 |---------|------|-------------|
+| 1.1 | 2025-09-04 | Updated to reflect AMBA APB interface implementation |
 | 1.0 | 2025-09-04 | Initial release of detailed micro-architecture specification |
 
 ## Navigation
