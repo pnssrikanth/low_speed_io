@@ -53,10 +53,203 @@ This document defines the timing requirements and constraints for the I2C IP cor
 ## Internal Timing Constraints
 
 ### Clock Domain Specifications
-- **System Clock**: Primary clock domain for all internal logic
-- **I2C Clock**: Derived from system clock, asynchronous to system clock
-- **Clock Frequency Range**: 10 MHz to 200 MHz (system clock)
+- **System Clock (PCLK)**: Primary clock domain for all internal logic (10-200 MHz)
+- **I2C Clock (SCL)**: Derived from system clock, asynchronous to system clock
+- **Clock Frequency Range**: 10 MHz to 200 MHz (APB system clock)
 - **Clock Jitter Tolerance**: ±5% of clock period
+- **SCL Frequency Range**: 1 kHz to 3.4 MHz (depending on system clock and divider)
+
+### Clock Divider Architecture
+
+#### Divider Operation
+The I2C clock is generated using a programmable divider that creates a 50% duty cycle SCL signal:
+
+```
+SCL Frequency = System Clock Frequency / (2 × Divider Value)
+```
+
+#### Divider Value Sources
+1. **Automatic Mode**: Pre-calculated values based on CONFIG register speed mode
+2. **Manual Mode**: Custom divider value from TIMING register (overrides automatic)
+
+#### Automatic Divider Values (for 10 MHz system clock)
+| Speed Mode | Target SCL | Divider | Actual SCL | Notes |
+|------------|------------|---------|------------|-------|
+| Standard | 100 kHz | 50 | 100 kHz | Exact match |
+| Fast | 400 kHz | 12.5 | 400 kHz | Rounded to 12/13 |
+| Fast+ | 1 MHz | 5 | 1 MHz | Exact match |
+| High Speed | 3.4 MHz | 1.47 | ~3.4 MHz | Rounded |
+
+#### Manual Divider Calculation
+```
+Divider = (System Clock Frequency) / (2 × Desired SCL Frequency)
+```
+
+**Examples:**
+- 50 MHz system clock, 100 kHz SCL: Divider = 50,000,000 / (2 × 100,000) = 250
+- 100 MHz system clock, 400 kHz SCL: Divider = 100,000,000 / (2 × 400,000) = 125
+- 25 MHz system clock, 1 MHz SCL: Divider = 25,000,000 / (2 × 1,000,000) = 12.5 → 12 or 13
+
+### Programming the Clock Divider
+
+#### Method 1: Automatic Speed Mode (Recommended)
+```c
+// Set speed mode in CONFIG register (bits 1:0)
+#define I2C_SPEED_STANDARD  0x00  // 100 kHz
+#define I2C_SPEED_FAST      0x01  // 400 kHz
+#define I2C_SPEED_FAST_PLUS 0x02  // 1 MHz
+#define I2C_SPEED_HIGH      0x03  // 3.4 MHz
+
+// Example: Configure for Fast Mode (400 kHz)
+I2C->CONFIG = I2C_SPEED_FAST;  // Uses automatic divider
+```
+
+#### Method 2: Manual Divider Value
+```c
+// Override with custom divider in TIMING register
+// Example: 50 MHz system clock, target 200 kHz SCL
+uint32_t divider = 50000000 / (2 * 200000);  // = 125
+I2C->TIMING = divider;
+
+// For 100 MHz system clock, target 1 MHz SCL
+uint32_t divider = 100000000 / (2 * 1000000);  // = 50
+I2C->TIMING = divider;
+```
+
+#### Method 3: Dynamic Frequency Changes
+```c
+// Change frequency during operation
+void i2c_set_frequency(uint32_t hz) {
+    uint32_t sys_freq = get_system_clock_freq();
+    uint32_t divider = sys_freq / (2 * hz);
+    I2C->TIMING = divider;
+}
+
+// Usage
+i2c_set_frequency(100000);   // 100 kHz
+i2c_set_frequency(400000);   // 400 kHz
+i2c_set_frequency(1000000);  // 1 MHz
+```
+
+### Clock Divider Constraints
+
+#### Minimum/Maximum Values
+- **Minimum Divider**: 2 (maximum SCL frequency = System Clock / 4)
+- **Maximum Divider**: 65535 (16-bit counter)
+- **Recommended Range**: 3 to 50000 (for practical SCL frequencies)
+
+#### Precision Considerations
+- Divider values are rounded down (truncated)
+- Actual SCL frequency = System Clock / (2 × floor(Divider))
+- Frequency error < 0.5% for most practical values
+
+#### System Clock Frequency Detection
+```c
+// Auto-detect system clock for divider calculation
+uint32_t get_optimal_divider(uint32_t target_scl_hz) {
+    const uint32_t sys_freqs[] = {10000000, 25000000, 50000000, 100000000, 200000000};
+    uint32_t best_divider = 100;  // Default
+    uint32_t min_error = UINT32_MAX;
+
+    for (int i = 0; i < sizeof(sys_freqs)/sizeof(sys_freqs[0]); i++) {
+        uint32_t divider = sys_freqs[i] / (2 * target_scl_hz);
+        if (divider >= 2 && divider <= 65535) {
+            uint32_t actual_freq = sys_freqs[i] / (2 * divider);
+            uint32_t error = abs((int32_t)actual_freq - (int32_t)target_scl_hz);
+            if (error < min_error) {
+                min_error = error;
+                best_divider = divider;
+            }
+        }
+    }
+    return best_divider;
+}
+```
+
+### APB Interface Timing
+| APB Signal | Setup Time (ns) | Hold Time (ns) | Clock Edge |
+|------------|-----------------|---------------|------------|
+| PADDR | 2.0 | 1.0 | PCLK rising |
+| PWDATA | 2.0 | 1.0 | PCLK rising |
+| PWRITE | 2.0 | 1.0 | PCLK rising |
+| PSEL | 2.0 | 1.0 | PCLK rising |
+| PENABLE | 2.0 | 1.0 | PCLK rising |
+| PRDATA | - | 2.0 | PCLK rising |
+| PREADY | - | 2.0 | PCLK rising |
+| PSLVERR | - | 2.0 | PCLK rising |
+
+### Practical Programming Guide
+
+#### 1. Basic I2C Setup with Automatic Speed Mode
+```c
+void i2c_init_basic(uint32_t speed_mode) {
+    // Reset I2C core
+    I2C->CTRL = 0;
+
+    // Configure speed mode (uses automatic divider)
+    I2C->CONFIG = speed_mode;
+
+    // Enable interrupts
+    I2C->CTRL |= (1 << 6);  // INT_EN bit
+
+    // Enable I2C core
+    I2C->CTRL |= (1 << 0);  // ENABLE bit
+}
+```
+
+#### 2. Advanced Setup with Custom Timing
+```c
+void i2c_init_advanced(uint32_t sys_clock_hz, uint32_t target_scl_hz) {
+    // Reset I2C core
+    I2C->CTRL = 0;
+
+    // Calculate and set custom divider
+    uint32_t divider = sys_clock_hz / (2 * target_scl_hz);
+    I2C->TIMING = divider;
+
+    // Configure other settings
+    I2C->CONFIG = 0;  // Use manual timing (TIMING register)
+
+    // Enable I2C core
+    I2C->CTRL |= (1 << 0);  // ENABLE bit
+}
+```
+
+#### 3. Runtime Frequency Changes
+```c
+void i2c_change_frequency(uint32_t new_scl_hz) {
+    // Calculate new divider
+    uint32_t sys_freq = 50000000;  // Your system clock frequency
+    uint32_t divider = sys_freq / (2 * new_scl_hz);
+
+    // Update timing register
+    I2C->TIMING = divider;
+
+    // Wait for timing update (optional)
+    // Small delay may be needed for clock manager to sync
+}
+```
+
+#### 4. Frequency Verification
+```c
+uint32_t i2c_get_actual_frequency(void) {
+    uint32_t sys_freq = 50000000;  // Your system clock frequency
+    uint32_t divider = I2C->TIMING;
+
+    if (divider == 0) {
+        // Using automatic mode - check CONFIG register
+        uint32_t speed_mode = I2C->CONFIG & 0x03;
+        switch (speed_mode) {
+            case 0: divider = 50; break;   // 100 kHz at 10 MHz
+            case 1: divider = 12; break;   // 400 kHz at 10 MHz
+            case 2: divider = 5; break;    // 1 MHz at 10 MHz
+            case 3: divider = 1; break;    // 3.4 MHz at 10 MHz
+        }
+    }
+
+    return sys_freq / (2 * divider);
+}
+```
 
 ### Setup and Hold Times
 | Signal | Setup Time (ns) | Hold Time (ns) | Clock Edge |
