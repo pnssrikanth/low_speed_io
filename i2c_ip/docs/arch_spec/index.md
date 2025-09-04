@@ -76,6 +76,11 @@ This document provides a comprehensive architecture specification for the I2C IP
 - **Tables**: Structured data presentation
 - **Diagrams**: ASCII art and Mermaid diagrams for visual representation
 
+## Related Documentation
+
+- **[Detailed Micro-Architecture Specification](../micro_arch_spec/index.md)**: Comprehensive implementation guide with code examples and testing guidelines
+- **[Product Requirements Document](../PRD.md)**: Requirements and features overview
+
 ## Feedback and Contributions
 
 This is an open-source project. Feedback and contributions are welcome via GitHub issues and pull requests.
