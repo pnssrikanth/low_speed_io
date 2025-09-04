@@ -187,28 +187,59 @@ module i2c_master_fsm (
 endmodule
 ```
 
-## I/O Buffer with Open-Drain
+## External I/O Buffer Interface
 
-### Bidirectional Buffer
+### I2C IP to IO Buffer Interface
+The I2C IP core provides control signals for external IO buffers. The SoC integration layer must implement the IO buffer with the following interface:
+
 ```verilog
-module i2c_io_buffer (
-    input wire sda_in,     // Internal SDA input
-    input wire sda_oe,     // Output enable
-    input wire scl_in,     // Internal SCL input
-    input wire scl_oe,     // SCL output enable
-    inout wire sda,        // External SDA
-    output wire scl_out    // External SCL
+// I2C IP Core Interface (from IP perspective)
+module i2c_core_interface (
+    // Outputs to external IO buffer
+    output wire sda_out,      // Data output to buffer
+    output wire sda_oe,       // SDA output enable
+    output wire scl_out,      // Clock output to buffer
+    output wire scl_oe,       // SCL output enable
+
+    // Inputs from external IO buffer
+    input wire sda_in,        // Data input from buffer
+    input wire scl_in         // Clock input from buffer
 );
 
-    // SDA bidirectional buffer
-    assign sda = sda_oe ? sda_in : 1'bz;
-    assign sda_in_int = sda;
+// External IO Buffer Implementation (SoC integration)
+module i2c_io_buffer (
+    // From I2C IP
+    input wire sda_out,
+    input wire sda_oe,
+    input wire scl_out,
+    input wire scl_oe,
 
-    // SCL output buffer (open drain)
-    assign scl_out = scl_oe ? scl_in : 1'bz;
+    // To I2C IP
+    output wire sda_in,
+    output wire scl_in,
+
+    // External pins
+    inout wire sda_pad,
+    inout wire scl_pad
+);
+
+    // SDA: Bidirectional with open-drain
+    assign sda_pad = sda_oe ? sda_out : 1'bz;
+    assign sda_in = sda_pad;
+
+    // SCL: Bidirectional with open-drain
+    assign scl_pad = scl_oe ? scl_out : 1'bz;
+    assign scl_in = scl_pad;
 
 endmodule
 ```
+
+### IO Buffer Requirements
+- **Open-Drain Drivers**: Required for both SDA and SCL
+- **Input Synchronization**: Must synchronize asynchronous inputs to system clock
+- **Glitch Filtering**: Filter noise on SDA/SCL inputs
+- **Drive Strength**: Configurable output current (4mA typical)
+- **Pull-up Support**: Compatible with external pull-up resistors
 
 ## Best Practices
 

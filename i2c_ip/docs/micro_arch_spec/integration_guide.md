@@ -12,9 +12,13 @@ module soc_top (
     input wire sys_clk,
     input wire sys_rst_n,
 
-    // I2C interface
-    inout wire i2c_scl,
-    inout wire i2c_sda,
+    // I2C interface (external IO buffer)
+    input wire i2c_scl_in,
+    input wire i2c_sda_in,
+    output wire i2c_scl_out,
+    output wire i2c_scl_oe,
+    output wire i2c_sda_out,
+    output wire i2c_sda_oe,
 
     // APB interface (example)
     input wire apb_pclk,
@@ -38,8 +42,12 @@ module soc_top (
     i2c_master i2c_inst (
         .clk(sys_clk),
         .rst_n(sys_rst_n),
-        .scl(i2c_scl),
-        .sda(i2c_sda),
+        .scl_in(i2c_scl_in),
+        .scl_out(i2c_scl_out),
+        .scl_oe(i2c_scl_oe),
+        .sda_in(i2c_sda_in),
+        .sda_out(i2c_sda_out),
+        .sda_oe(i2c_sda_oe),
         .irq(i2c_irq),
         // ... other connections
     );
@@ -96,6 +104,76 @@ module power_control (
 
 endmodule
 ```
+
+### IO Buffer Integration
+The I2C IP core requires external IO buffers for proper I2C bus operation. The SoC integration layer must provide these buffers with the following interface:
+
+#### Required IO Buffer Signals
+```verilog
+module i2c_io_buffer (
+    // From I2C IP
+    input wire sda_out,      // Data output from IP
+    input wire sda_oe,       // Output enable for SDA
+    input wire scl_out,      // Clock output from IP
+    input wire scl_oe,       // Output enable for SCL
+
+    // To I2C IP
+    output wire sda_in,      // Data input to IP
+    output wire scl_in,      // Clock input to IP
+
+    // External I2C bus
+    inout wire sda_pad,      // Physical SDA pin
+    inout wire scl_pad       // Physical SCL pin
+);
+```
+
+#### IO Buffer Implementation Requirements
+```verilog
+module i2c_io_buffer_impl (
+    input wire sda_out,
+    input wire sda_oe,
+    input wire scl_out,
+    input wire scl_oe,
+    output wire sda_in,
+    output wire scl_in,
+    inout wire sda_pad,
+    inout wire scl_pad
+);
+
+    // SDA Buffer
+    assign sda_pad = sda_oe ? sda_out : 1'bz;
+    assign sda_in = sda_pad;
+
+    // SCL Buffer
+    assign scl_pad = scl_oe ? scl_out : 1'bz;
+    assign scl_in = scl_pad;
+
+endmodule
+```
+
+#### IO Buffer Features Required
+- **Open-Drain Outputs**: Both SDA and SCL must use open-drain drivers
+- **Input Synchronization**: Metastability protection for asynchronous inputs
+- **Glitch Filtering**: Noise filtering on SDA and SCL inputs
+- **Drive Strength Control**: Configurable output drive strength (4mA typical)
+- **Pull-up Resistors**: Internal or external pull-ups to VDD
+- **ESD Protection**: ±8kV HBM protection minimum
+- **Bus Contention Detection**: Optional, for multi-master scenarios
+
+#### IO Buffer Configuration Parameters
+| Parameter | Typical Value | Description |
+|-----------|---------------|-------------|
+| Drive Strength | 4mA | Output current capability |
+| Pull-up Resistance | 4.7kΩ | External pull-up value |
+| Filter Time | 50ns | Input glitch filter time |
+| ESD Rating | ±8kV | ESD protection level |
+
+#### Signal Usage Guidelines
+- **sda_oe/scl_oe**: Active high enables output drivers
+- **sda_out/scl_out**: Data/clock values when output enabled
+- **sda_in/scl_in**: Must be synchronized to system clock domain
+- **High-Impedance**: When oe=0, outputs go to high-impedance
+- **Pull-up Dependency**: External pull-ups required for proper I2C operation
 
 ## Register Interface
 
@@ -430,6 +508,57 @@ err_disable_clk:
 - **Power**: Measure current consumption in different modes
 - **Reliability**: Run extended stress tests
 
+## Board Design Considerations
+
+### I2C Bus Routing with External IO Buffers
+- **Signal Integrity**: Route SDA and SCL traces with controlled impedance (50-100Ω)
+- **Trace Length Matching**: Keep SDA and SCL trace lengths equal (< 30cm)
+- **Crosstalk Minimization**: Maintain >10:1 signal-to-noise ratio
+- **Layer Stack-up**: Use appropriate PCB layers for I2C signals
+
+### Pull-up Resistor Selection
+| Speed Mode | Pull-up Value | Bus Capacitance | Notes |
+|------------|---------------|-----------------|-------|
+| Standard (100kHz) | 4.7kΩ - 10kΩ | < 400pF | External resistors required |
+| Fast (400kHz) | 1kΩ - 4.7kΩ | < 400pF | Lower values for faster edges |
+| Fast+ (1MHz) | 470Ω - 2kΩ | < 200pF | Very low capacitance required |
+| High Speed (3.4MHz) | 470Ω - 2kΩ | < 100pF | Specialized buffers needed |
+
+### IO Buffer Placement
+- **Location**: Place IO buffers near the physical I2C pins
+- **Power Supply**: Connect to clean power rail with decoupling
+- **Thermal Considerations**: Ensure adequate heat dissipation for high-drive buffers
+- **Test Access**: Provide test points for SDA/SCL signals
+
+### ESD and Protection
+- **ESD Protection**: Include TVS diodes rated for ±8kV (HBM)
+- **Protection Level**: Meet automotive ESD requirements if applicable
+- **Clamping Voltage**: Ensure protection diodes clamp below VDD + 0.5V
+- **Board-Level Testing**: Verify ESD protection during board bring-up
+
+### Power Supply Filtering
+```verilog
+// Recommended decoupling for IO buffers
+module power_filter (
+    input wire vdd_raw,
+    output wire vdd_clean
+);
+
+    // 10uF bulk capacitor
+    // 0.1uF ceramic capacitor per buffer
+    // Ferrite bead for noise isolation
+
+endmodule
+```
+
+### Signal Quality Monitoring
+- **Rise/Fall Times**: Monitor SDA/SCL edge rates
+- **Overshoot/Undershoot**: Ensure < 10% of VDD
+- **Jitter**: Keep clock jitter < 50ns peak-to-peak
+- **Bus Contention**: Detect and handle multi-master conflicts
+
 ---
+
+[Back to Index](index.md) | [Previous: Testing Guidelines](testing_guidelines.md)
 
 [Back to Index](index.md) | [Previous: Testing Guidelines](testing_guidelines.md)

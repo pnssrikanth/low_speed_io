@@ -116,19 +116,30 @@ This document details the internal modules of the I2C IP core, their interconnec
 - `DATA_WIDTH`: Data width (default: 8)
 - `SHIFT_DIR`: Shift direction (0: LSB first, 1: MSB first)
 
-### 5. I/O Buffer Module
-**Purpose**: Manages bidirectional I2C bus signals with proper drive strength.
+### 5. I/O Buffer Interface (External)
+**Purpose**: Provides control signals for external I2C bus IO buffers managed by SoC integration.
 
-**Features**:
-- Open-drain output drivers
-- Input synchronization
-- Glitch filtering
+**Features** (Required from External IO Buffer):
+- Open-drain output drivers for SDA and SCL
+- Input synchronization and metastability protection
+- Glitch filtering on inputs
 - Bus contention detection
+- Programmable drive strength
+- ESD protection
 
-**Parameters**:
+**Control Signals Provided by IP**:
+- `sda_out`: Data output to buffer
+- `sda_oe`: Output enable for SDA
+- `scl_out`: Clock output to buffer
+- `scl_oe`: Output enable for SCL
+- `sda_in`: Data input from buffer
+- `scl_in`: Clock input from buffer
+
+**Expected IO Buffer Parameters**:
 - `DRIVE_STRENGTH`: Output drive strength (default: 4mA)
 - `FILTER_EN`: Input filtering enable (default: 1)
 - `FILTER_LEN`: Filter length in clock cycles (default: 3)
+- `PULLUP_EN`: Internal pull-up enable (default: 1)
 
 ## Configurability Options
 
@@ -162,8 +173,8 @@ parameter CLK_GATE_EN = 1'b1; // Enable clock gating
 ## Module Interconnections
 
 ### Data Flow
-1. External data → Register Bank → Shift Register → I/O Buffer → SDA
-2. SDA → I/O Buffer → Shift Register → Register Bank → External data
+1. External data → Register Bank → Shift Register → IP outputs (sda_out, sda_oe) → External IO Buffer → SDA
+2. SDA → External IO Buffer → IP inputs (sda_in, scl_in) → Shift Register → Register Bank → External data
 
 ### Control Flow
 1. Control signals → Register Bank → Control FSM

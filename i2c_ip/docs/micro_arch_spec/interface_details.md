@@ -1,15 +1,19 @@
 # Interface Details
 
 ## Overview
-This document describes the external interfaces of the I2C IP core, including pin definitions, signal protocols, and timing diagrams. The IP core supports both master and slave modes with configurable I/O standards.
+This document describes the external interfaces of the I2C IP core, including pin definitions, signal protocols, and timing diagrams. The IP core supports both master and slave modes with configurable I/O standards. Note that I2C bus IO buffers are external to the IP core and handled by SoC integration, with the IP providing control signals for buffer management.
 
 ## Pin Interface
 
-### I2C Bus Signals
+### I2C Bus Signals (External IO Buffer Interface)
 | Signal | Direction | Description | Width |
 |--------|-----------|-------------|-------|
-| `scl` | Bidirectional | Serial Clock Line | 1 |
-| `sda` | Bidirectional | Serial Data Line | 1 |
+| `scl_out` | Output | Serial Clock Output to IO Buffer | 1 |
+| `scl_oe` | Output | Serial Clock Output Enable | 1 |
+| `scl_in` | Input | Serial Clock Input from IO Buffer | 1 |
+| `sda_out` | Output | Serial Data Output to IO Buffer | 1 |
+| `sda_oe` | Output | Serial Data Output Enable | 1 |
+| `sda_in` | Input | Serial Data Input from IO Buffer | 1 |
 
 ### Control and Status Signals
 | Signal | Direction | Description | Width |
