@@ -9,8 +9,8 @@
 
 module register_bank (
     // System interface
-    input  wire        i_sys_clk,         // System clock
-    input  wire        i_rst_n,           // Active low reset
+    input  wire        i_sys_clk,         // System clock (from APB PCLK)
+    input  wire        i_rst_n,           // Active low reset (from APB PRESETn)
 
     // Register access interface
     input  wire [3:0]  i_reg_addr,        // Register address (4-bit for 16 registers)

@@ -12,8 +12,8 @@ module power_mgmt #(
     parameter WAKE_ON_BUS = 1             // Wake on bus activity
 )(
     // System interface
-    input  wire        i_sys_clk,         // System clock
-    input  wire        i_rst_n,           // Active low reset
+    input  wire        i_sys_clk,         // System clock (from APB PCLK)
+    input  wire        i_rst_n,           // Active low reset (from APB PRESETn)
 
     // Control interface
     input  wire [1:0]  i_power_state_req, // Requested power state

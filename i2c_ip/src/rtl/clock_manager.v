@@ -12,8 +12,8 @@ module clock_manager #(
     parameter STRETCH_EN = 1      // Enable clock stretching (1: enabled, 0: disabled)
 )(
     // System interface
-    input  wire        i_sys_clk,         // System clock input
-    input  wire        i_rst_n,           // Active low reset
+    input  wire        i_sys_clk,         // System clock input (from APB PCLK)
+    input  wire        i_rst_n,           // Active low reset (from APB PRESETn)
     input  wire        i_enable,          // Module enable
     input  wire        i_stretch_req,     // Clock stretching request from slave
 

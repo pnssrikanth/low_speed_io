@@ -2,6 +2,7 @@
 // Module: i2c_top.v
 // Description: I2C Controller Top-Level Module
 //              Integrates all I2C sub-modules into a complete controller.
+//              Implements AMBA APB (Advanced Peripheral Bus) interface.
 // Author: AI Assistant
 // Date: 2025
 ////////////////////////////////////////////////////////////////////////////////
@@ -12,18 +13,17 @@ module i2c_top #(
     parameter DATA_WIDTH = 8,             // Data width
     parameter SHIFT_DIR = 0               // Shift direction (0: LSB first)
 )(
-    // System interface
-    input  wire        i_sys_clk,         // System clock
-    input  wire        i_rst_n,           // Active low reset
-
-    // Register interface (APB-like)
-    input  wire [3:0]  i_paddr,           // Register address
-    input  wire [31:0] i_pwdata,          // Write data
-    input  wire        i_pwrite,          // Write enable
-    input  wire        i_penable,         // Enable signal
-    input  wire        i_psel,            // Select signal
-    output wire [31:0] o_prdata,          // Read data
-    output wire        o_pready,          // Ready signal
+    // APB Interface (AMBA APB Protocol)
+    input  wire        PCLK,              // APB clock
+    input  wire        PRESETn,           // APB reset (active low)
+    input  wire [31:0] PADDR,             // APB address
+    input  wire        PSEL,              // APB select
+    input  wire        PENABLE,           // APB enable
+    input  wire        PWRITE,            // APB write enable
+    input  wire [31:0] PWDATA,            // APB write data
+    output wire [31:0] PRDATA,            // APB read data
+    output wire        PREADY,            // APB ready
+    output wire        PSLVERR,           // APB slave error
 
     // I2C bus interface
     input  wire        i_sda_in,          // SDA input from buffer
@@ -74,18 +74,81 @@ module i2c_top #(
     wire [15:0] divider;
     wire [1:0]  speed_mode;
 
+    // APB State Machine
+    localparam APB_IDLE   = 2'b00;
+    localparam APB_SETUP  = 2'b01;
+    localparam APB_ACCESS = 2'b10;
+
+    reg [1:0] apb_state;
+    reg [31:0] apb_addr_reg;
+    reg [31:0] apb_wdata_reg;
+    reg        apb_write_reg;
+    reg        apb_ready_reg;
+    reg        apb_slverr_reg;
+
     // Register access control
     wire [3:0]  reg_addr;
     wire [31:0] reg_wdata;
     wire        reg_write;
     wire [31:0] reg_rdata;
 
-    // APB interface logic
-    assign reg_addr   = i_paddr;
-    assign reg_wdata  = i_pwdata;
-    assign reg_write  = i_pwrite && i_penable && i_psel;
-    assign o_prdata   = reg_rdata;
-    assign o_pready   = 1'b1;  // Always ready for simplicity
+    // APB state machine
+    always @(posedge PCLK or negedge PRESETn) begin
+        if (!PRESETn) begin
+            apb_state      <= APB_IDLE;
+            apb_addr_reg   <= 32'h0;
+            apb_wdata_reg  <= 32'h0;
+            apb_write_reg  <= 1'b0;
+            apb_ready_reg  <= 1'b1;
+            apb_slverr_reg <= 1'b0;
+        end else begin
+            case (apb_state)
+                APB_IDLE: begin
+                    apb_ready_reg  <= 1'b1;
+                    apb_slverr_reg <= 1'b0;
+                    if (PSEL && !PENABLE) begin
+                        apb_state     <= APB_SETUP;
+                        apb_addr_reg  <= PADDR;
+                        apb_wdata_reg <= PWDATA;
+                        apb_write_reg <= PWRITE;
+                    end
+                end
+
+                APB_SETUP: begin
+                    if (PSEL && PENABLE) begin
+                        apb_state <= APB_ACCESS;
+                        // Check for valid address range (0x00-0x14 for registers)
+                        if (apb_addr_reg[7:0] > 8'h14) begin
+                            apb_slverr_reg <= 1'b1;
+                        end else begin
+                            apb_slverr_reg <= 1'b0;
+                        end
+                        apb_ready_reg <= 1'b1;  // Single cycle access
+                    end else if (!PSEL) begin
+                        apb_state <= APB_IDLE;
+                    end
+                end
+
+                APB_ACCESS: begin
+                    apb_state <= APB_IDLE;
+                    apb_ready_reg <= 1'b1;
+                end
+
+                default: begin
+                    apb_state <= APB_IDLE;
+                end
+            endcase
+        end
+    end
+
+    // APB interface signals
+    assign reg_addr   = apb_addr_reg[3:0];  // Use lower 4 bits for register address
+    assign reg_wdata  = apb_wdata_reg;
+    assign reg_write  = apb_write_reg && (apb_state == APB_ACCESS) && !apb_slverr_reg;
+
+    assign PRDATA     = reg_rdata;
+    assign PREADY     = apb_ready_reg;
+    assign PSLVERR    = apb_slverr_reg;
 
     // Extract configuration from registers
     assign divider    = timing_reg[15:0];
@@ -93,8 +156,8 @@ module i2c_top #(
 
     // Instantiate Register Bank
     register_bank u_register_bank (
-        .i_sys_clk      (i_sys_clk),
-        .i_rst_n        (i_rst_n || sw_rst),  // Software reset
+        .i_sys_clk      (PCLK),
+        .i_rst_n        (PRESETn && !sw_rst),  // Software reset
 
         .i_reg_addr     (reg_addr),
         .i_reg_wdata    (reg_wdata),
@@ -128,8 +191,8 @@ module i2c_top #(
 
     // Instantiate Control FSM
     control_fsm u_control_fsm (
-        .i_sys_clk      (i_sys_clk),
-        .i_rst_n        (i_rst_n),
+        .i_sys_clk      (PCLK),
+        .i_rst_n        (PRESETn),
 
         .i_enable       (enable),
         .i_mode         (mode),
@@ -172,8 +235,8 @@ module i2c_top #(
         .DATA_WIDTH     (DATA_WIDTH),
         .SHIFT_DIR      (SHIFT_DIR)
     ) u_shift_register (
-        .i_sys_clk      (i_sys_clk),
-        .i_rst_n        (i_rst_n),
+        .i_sys_clk      (PCLK),
+        .i_rst_n        (PRESETn),
 
         .i_load_data    (shift_load),
         .i_shift_en     (shift_en),
@@ -196,8 +259,8 @@ module i2c_top #(
         .CLK_DIV        (CLK_DIV),
         .STRETCH_EN     (STRETCH_EN)
     ) u_clock_manager (
-        .i_sys_clk      (i_sys_clk),
-        .i_rst_n        (i_rst_n),
+        .i_sys_clk      (PCLK),
+        .i_rst_n        (PRESETn),
         .i_enable       (enable),
         .i_stretch_req  (stretch_req),
 

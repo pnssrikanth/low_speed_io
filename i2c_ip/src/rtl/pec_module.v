@@ -8,8 +8,8 @@
 
 module pec_module (
     // System interface
-    input  wire        i_sys_clk,         // System clock
-    input  wire        i_rst_n,           // Active low reset
+    input  wire        i_sys_clk,         // System clock (from APB PCLK)
+    input  wire        i_rst_n,           // Active low reset (from APB PRESETn)
 
     // Control interface
     input  wire        i_pec_en,          // PEC enable
